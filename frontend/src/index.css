@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Professional Medical Color Palette - Subtle and Elegant */
+  --primary-color: #0B5394;
+  --primary-dark: #073763;
+  --primary-light: #3D85C6;
+  --primary-lighter: #E8F4F8;
+  --secondary-color: #16A085;
+  --secondary-light: #E8F8F5;
+  --accent-color: #E74C3C;
+  --accent-light: #FADBD8;
+  --success-color: #27AE60;
+  --warning-color: #F39C12;
+  --info-color: #3498DB;
+  
+  /* Accent Colors - Subtle */
+  --purple-accent: #8B5CF6;
+  --purple-light: #F3E8FF;
+  --teal-accent: #14B8A6;
+  --teal-light: #E0F2FE;
+  --rose-accent: #F43F5E;
+  --rose-light: #FFF1F2;
+  --amber-accent: #F59E0B;
+  --amber-light: #FFFBEB;
+  
+  /* Text Colors - Light Mode */
+  --text-primary: #1A1A1A;
+  --text-secondary: #4A5568;
+  --text-tertiary: #718096;
+  --text-light: #A0AEC0;
+  --text-white: #FFFFFF;
+  
+  /* Background Colors - Light Mode */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F7FAFC;
+  --bg-tertiary: #EDF2F7;
+  --bg-dark: #2D3748;
+  
+  /* Border Colors - Light Mode */
+  --border-color: #E2E8F0;
+  --border-light: #F1F5F9;
+  --border-dark: #CBD5E0;
+  
+  /* Shadows - More Subtle and Professional */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  
+  /* Border Radius */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+}
+
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-secondary);
+  min-height: 100vh;
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus styles for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
