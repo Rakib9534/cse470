@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
-import { addNotification } from '../services/notificationService';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { useControllers } from '../controllers/ControllerProvider.jsx';
+import { notificationAPI } from '../services/api.js';
 
 function LabUpload() {
-  const [patientId, setPatientId] = useState('');
+  const { user } = useAuth();
+  const { labResult: labResultController } = useControllers();
+
   const [patientEmail, setPatientEmail] = useState('');
   const [patientName, setPatientName] = useState('');
   const [testType, setTestType] = useState('');
@@ -13,14 +17,29 @@ function LabUpload() {
   const [notes, setNotes] = useState('');
   const [message, setMessage] = useState('');
   const [uploadedResults, setUploadedResults] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Load uploaded results from localStorage on mount
+  // Load uploaded results for this technician from API on mount
   useEffect(() => {
-    const saved = localStorage.getItem('labResults');
-    if (saved) {
-      setUploadedResults(JSON.parse(saved));
-    }
-  }, []);
+    const loadResults = async () => {
+      try {
+        setLoading(true);
+        // Lab technicians typically filter by their own uploads
+        const result = await labResultController.getAllLabResults();
+        if (result.success) {
+          setUploadedResults(result.labResults.map(r => r.toJSON()));
+        } else {
+          setUploadedResults([]);
+        }
+      } catch (error) {
+        console.error('Error loading lab results:', error);
+        setUploadedResults([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadResults();
+  }, [labResultController]);
 
   // Auto-clear success message after 5 seconds
   useEffect(() => {
@@ -43,60 +62,77 @@ function LabUpload() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!patientId || !testType || !testDate || !labFile || !technicianName) {
-      setMessage('Please fill all required fields.');
+    if (!patientEmail || !testType || !testDate || !labFile) {
+      setMessage('Please fill all required fields including patient email.');
       return;
     }
 
-    const newLabResult = {
-      id: Date.now().toString(),
-      patientId,
-      patientEmail: patientEmail || null,
-      patientName: patientName || null,
-      testType,
-      testDate,
-      fileName: fileName,
-      technicianName,
-      notes,
-      uploadDate: new Date().toISOString().split('T')[0],
+    if (!user || (user.role !== 'admin' && user.role !== 'technician')) {
+      setMessage('Only authorized lab staff can upload results. Please log in as a lab technician or admin.');
+      return;
+    }
+
+    const submit = async () => {
+      try {
+        setLoading(true);
+        setMessage('');
+
+        const labResultPayload = {
+          patientEmail,
+          patientName: patientName || undefined,
+          testName: testType,
+          testType,
+          results: `Report file: ${fileName}`,
+          testDate,
+          technicianName: technicianName || user.name,
+          fileUrl: '',
+          notes
+        };
+
+        const createResult = await labResultController.createLabResult(labResultPayload);
+
+        if (!createResult.success) {
+          setMessage(createResult.error || 'Failed to upload lab result.');
+          return;
+        }
+
+        const saved = createResult.labResult.toJSON();
+        setUploadedResults(prev => [saved, ...prev]);
+
+        // Notify patient via backend notifications
+        try {
+          await notificationAPI.create({
+            title: 'New Lab Report Available',
+            message: `Your ${testType} report dated ${testDate} is now available in your portal.`,
+            type: 'lab_result',
+            // backend will resolve userId from auth token; this call is for staff account,
+            // so we rely on patient viewing reports via email filter in their dashboard
+          });
+        } catch (err) {
+          console.error('Failed to create notification for lab result:', err);
+        }
+
+        setMessage('Lab result uploaded successfully and linked to the patient email.');
+
+        // Reset form
+        setPatientEmail('');
+        setPatientName('');
+        setTestType('');
+        setTestDate('');
+        setLabFile(null);
+        setFileName('');
+        setTechnicianName('');
+        setNotes('');
+        e.target.reset();
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const updatedResults = [...uploadedResults, newLabResult];
-    setUploadedResults(updatedResults);
-    localStorage.setItem('labResults', JSON.stringify(updatedResults));
-
-    // Add notification for lab result upload
-    addNotification({
-      id: Date.now().toString(),
-      title: 'Lab Report Uploaded',
-      message: `Lab result for ${testType} has been uploaded for Patient ID: ${patientId}`,
-      timestamp: new Date().toISOString(),
-      read: false,
-      type: 'lab_result'
-    });
-
-    setMessage('Lab result uploaded successfully for Patient ID: ' + patientId);
-    
-    // Reset form
-    setPatientId('');
-    setPatientEmail('');
-    setPatientName('');
-    setTestType('');
-    setTestDate('');
-    setLabFile(null);
-    setFileName('');
-    setTechnicianName('');
-    setNotes('');
-    e.target.reset();
+    submit();
   };
 
-  const handlePatientIdFilter = (e) => {
-    setPatientId(e.target.value);
-  };
-
-  const filteredResults = patientId
-    ? uploadedResults.filter((result) => result.patientId === patientId)
-    : uploadedResults;
+  const filteredResults = uploadedResults;
 
   return (
     <div className="page-container">
@@ -107,20 +143,6 @@ function LabUpload() {
         </div>
 
         <form onSubmit={handleSubmit} style={{ marginTop: '2rem' }}>
-          <div className="form-group">
-            <label className="form-label">
-              Patient ID <span className="required">*</span>
-            </label>
-            <input
-              type="text"
-              className="form-input"
-              value={patientId}
-              onChange={(e) => setPatientId(e.target.value)}
-              placeholder="Enter patient ID (e.g., P001, P002)"
-              required
-            />
-          </div>
-
           <div className="form-group">
             <label className="form-label">
               Patient Email (Optional)
@@ -273,8 +295,8 @@ function LabUpload() {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-            Upload Lab Result
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={loading}>
+            {loading ? 'Uploading...' : 'Upload Lab Result'}
           </button>
         </form>
 
@@ -290,21 +312,14 @@ function LabUpload() {
         <div className="card" style={{ marginTop: '2rem' }}>
           <div className="card-header">
             <h2 className="card-title">Uploaded Lab Results</h2>
-            <p className="card-subtitle">View previously uploaded lab results</p>
+            <p className="card-subtitle">View previously uploaded lab results (from MongoDB)</p>
           </div>
 
-          <div className="filter-container">
-            <label className="form-label">Filter by Patient ID</label>
-            <input
-              type="text"
-              className="filter-input"
-              value={patientId}
-              onChange={handlePatientIdFilter}
-              placeholder="Enter patient ID to filter results"
-            />
-          </div>
-
-          {filteredResults.length === 0 ? (
+          {loading ? (
+            <div className="empty-state">
+              <p className="empty-state-text">Loading lab results...</p>
+            </div>
+          ) : filteredResults.length === 0 ? (
             <div className="empty-state">
               <div style={{
                 width: '64px',
@@ -330,22 +345,22 @@ function LabUpload() {
                 <div key={result.id} className="appointment-card" style={{ borderLeftColor: 'var(--accent-color)' }}>
                   <div className="appointment-header">
                     <div>
-                      <div className="appointment-doctor">Patient ID: {result.patientId}</div>
+                      <div className="appointment-doctor">{result.patientName || 'Unknown Patient'}</div>
                       <div className="appointment-speciality">{result.testType}</div>
                     </div>
                   </div>
                   <div className="appointment-details">
                     <div className="appointment-detail">
                       <span className="appointment-detail-label">Test Date</span>
-                      <span className="appointment-detail-value">{result.testDate}</span>
+                      <span className="appointment-detail-value">{new Date(result.testDate).toLocaleDateString()}</span>
                     </div>
                     <div className="appointment-detail">
-                      <span className="appointment-detail-label">Upload Date</span>
-                      <span className="appointment-detail-value">{result.uploadDate}</span>
+                      <span className="appointment-detail-label">Report Date</span>
+                      <span className="appointment-detail-value">{result.reportDate ? new Date(result.reportDate).toLocaleDateString() : '-'}</span>
                     </div>
                     <div className="appointment-detail">
-                      <span className="appointment-detail-label">File Name</span>
-                      <span className="appointment-detail-value">{result.fileName}</span>
+                      <span className="appointment-detail-label">Patient Email</span>
+                      <span className="appointment-detail-value">{result.patientEmail}</span>
                     </div>
                     <div className="appointment-detail">
                       <span className="appointment-detail-label">Technician</span>

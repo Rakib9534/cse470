@@ -3,41 +3,82 @@ import {
   getNotifications,
   markAllAsRead
 } from "../services/notificationService";
+import { notificationAPI } from "../services/api";
 
 const NotificationBell = () => {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadNotifications = () => {
-      setNotifications(getNotifications());
+    const loadNotifications = async () => {
+      try {
+        setLoading(true);
+        const result = await notificationAPI.getAll();
+        if (result.success) {
+          setNotifications(result.data || []);
+        } else {
+          // Fallback to local service
+          const localNotifications = await getNotifications();
+          setNotifications(localNotifications);
+        }
+      } catch (error) {
+        // Fallback to local service
+        const localNotifications = await getNotifications();
+        setNotifications(localNotifications);
+      } finally {
+        setLoading(false);
+      }
     };
     
     loadNotifications();
     
-    // Refresh notifications every 2 seconds
-    const interval = setInterval(loadNotifications, 2000);
+    // Refresh notifications every 30 seconds
+    const interval = setInterval(loadNotifications, 30000);
     
     return () => clearInterval(interval);
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const toggleBell = () => {
-    setOpen(!open);
+  const toggleBell = async () => {
     if (open) {
-      markAllAsRead();
-      setNotifications(getNotifications());
+      // Mark all as read when closing
+      try {
+        await notificationAPI.markAllAsRead();
+      } catch (error) {
+        await markAllAsRead();
+      }
+      // Reload notifications
+      const result = await notificationAPI.getAll();
+      if (result.success) {
+        setNotifications(result.data || []);
+      } else {
+        const localNotifications = await getNotifications();
+        setNotifications(localNotifications);
+      }
     }
+    setOpen(!open);
   };
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = async (event) => {
       if (open && !event.target.closest('.notification-bell-container')) {
         setOpen(false);
-        markAllAsRead();
-        setNotifications(getNotifications());
+        try {
+          await notificationAPI.markAllAsRead();
+        } catch (error) {
+          await markAllAsRead();
+        }
+        // Reload notifications
+        const result = await notificationAPI.getAll();
+        if (result.success) {
+          setNotifications(result.data || []);
+        } else {
+          const localNotifications = await getNotifications();
+          setNotifications(localNotifications);
+        }
       }
     };
 
@@ -168,9 +209,9 @@ const NotificationBell = () => {
           ) : (
             <div>
               {notifications.map(n => (
-                <div
-                  key={n.id}
-                  style={{
+              <div
+                key={n._id || n.id}
+                style={{
                     padding: "0.75rem",
                     borderBottom: "1px solid var(--border-light)",
                     borderRadius: "var(--radius-md)",
@@ -178,7 +219,7 @@ const NotificationBell = () => {
                     background: n.read ? "transparent" : "var(--primary-lighter)",
                     transition: "all 0.2s ease",
                     cursor: "pointer"
-                  }}
+                }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = "var(--bg-secondary)";
                   }}
@@ -216,20 +257,20 @@ const NotificationBell = () => {
                       }}>
                         {n.message}
                       </p>
-                      {n.timestamp && (
+                      {(n.timestamp || n.createdAt) && (
                         <div style={{
                           fontSize: "0.75rem",
                           color: "var(--text-tertiary)",
                           marginTop: "0.5rem"
                         }}>
-                          {new Date(n.timestamp).toLocaleString()}
+                          {new Date(n.timestamp || n.createdAt).toLocaleString()}
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
               ))}
-            </div>
+              </div>
           )}
         </div>
       )}

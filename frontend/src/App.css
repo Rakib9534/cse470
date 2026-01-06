@@ -228,6 +228,33 @@
   line-height: 1.4;
 }
 
+.required {
+  color: var(--accent-color);
+  margin-left: 0.25rem;
+}
+
+.form-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-family: inherit;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(11, 83, 148, 0.1);
+}
+
+.form-select:hover {
+  border-color: var(--border-dark);
+}
+
 .form-label .required {
   color: var(--accent-color);
   margin-left: 0.25rem;

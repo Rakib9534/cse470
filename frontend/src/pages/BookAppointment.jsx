@@ -1,16 +1,44 @@
 import { useState, useEffect } from 'react';
-import { addNotification } from '../services/notificationService';
+import { useControllers } from '../controllers/ControllerProvider.jsx';
 
-function BookAppointment({ doctors, onCreateAppointment }) {
+function BookAppointment({ doctors, onCreateAppointment, defaultEmail = '', defaultName = '' }) {
+  const { appointment: appointmentController, doctorSlot: doctorSlotController } = useControllers();
   const [doctorId, setDoctorId] = useState(doctors[0]?.id || '');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
-  const [patientName, setPatientName] = useState('');
-  const [email, setEmail] = useState('');
+  const [patientName, setPatientName] = useState(defaultName);
+  const [email, setEmail] = useState(defaultEmail);
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const selectedDoctor = doctors.find((d) => d.id === doctorId) || doctors[0];
+
+  // Fetch available slots when doctor or date changes
+  useEffect(() => {
+    if (doctorId && date) {
+      fetchAvailableSlots();
+    } else {
+      setAvailableSlots([]);
+    }
+  }, [doctorId, date]);
+
+  const fetchAvailableSlots = async () => {
+    try {
+      const result = await doctorSlotController.getSlots(doctorId, date);
+      if (result.success && result.availableSlots.length > 0) {
+        setAvailableSlots(result.availableSlots);
+      } else {
+        // Fallback to default slots if API fails
+        setAvailableSlots(selectedDoctor.slots || []);
+      }
+    } catch (error) {
+      console.error('Error fetching slots:', error);
+      // Fallback to default slots
+      setAvailableSlots(selectedDoctor.slots || []);
+    }
+  };
 
   // Auto-clear success message after 5 seconds
   useEffect(() => {
@@ -22,46 +50,59 @@ function BookAppointment({ doctors, onCreateAppointment }) {
     }
   }, [message]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setMessage('');
 
     if (!doctorId || !date || !time || !patientName || !email) {
       setMessage('Please fill all required fields.');
+      setLoading(false);
       return;
     }
 
-    const newAppointment = {
-      id: Date.now().toString(),
-      doctorId,
-      doctorName: selectedDoctor.name,
-      speciality: selectedDoctor.speciality,
-      date,
-      time,
-      patientName,
-      email,
-      phone,
-    };
+    try {
+      const appointmentData = {
+        doctorId,
+        doctorName: selectedDoctor.name,
+        speciality: selectedDoctor.speciality,
+        date,
+        time,
+        patientName,
+        email,
+        phone: phone || '',
+      };
 
-    onCreateAppointment(newAppointment);
-    
-    // Add notification for appointment booking
-    addNotification({
-      id: Date.now().toString(),
-      title: 'Appointment Booked',
-      message: `Appointment confirmed with ${selectedDoctor.name} (${selectedDoctor.speciality}) on ${date} at ${time}`,
-      timestamp: new Date().toISOString(),
-      read: false,
-      type: 'appointment'
-    });
-    
-    setMessage('Appointment booked successfully and added to your dashboard.');
-    
-    // Reset form fields (except doctor selection)
-    setDate('');
-    setTime('');
-    setPatientName('');
-    setEmail('');
-    setPhone('');
+      // Create appointment using controller
+      const result = await appointmentController.createAppointment(appointmentData);
+
+      if (result.success) {
+        // Update local state if callback provided
+        if (onCreateAppointment) {
+          onCreateAppointment(result.appointment.toJSON());
+        }
+
+        // Notification is automatically created by the backend
+        setMessage('✅ Appointment booked successfully!');
+        
+        // Refresh available slots
+        await fetchAvailableSlots();
+        
+        // Reset form fields (except doctor selection)
+        setDate('');
+        setTime('');
+        setPatientName('');
+        setEmail('');
+        setPhone('');
+      } else {
+        setMessage(`❌ ${result.error || 'Failed to book appointment. Please try again.'}`);
+      }
+    } catch (error) {
+      console.error('Error booking appointment:', error);
+      setMessage(`❌ ${error.message || 'Failed to book appointment. Please try again.'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -83,6 +124,7 @@ function BookAppointment({ doctors, onCreateAppointment }) {
               value={patientName}
               onChange={(e) => setPatientName(e.target.value)}
               placeholder="Enter your full name"
+              required
             />
           </div>
 
@@ -96,6 +138,7 @@ function BookAppointment({ doctors, onCreateAppointment }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your.email@example.com"
+              required
             />
           </div>
 
@@ -121,6 +164,7 @@ function BookAppointment({ doctors, onCreateAppointment }) {
                 setDoctorId(e.target.value);
                 setTime('');
               }}
+              required
             >
               {doctors.map((doc) => (
                 <option key={doc.id} value={doc.id}>
@@ -139,6 +183,8 @@ function BookAppointment({ doctors, onCreateAppointment }) {
               className="form-input"
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              required
             />
           </div>
 
@@ -150,23 +196,37 @@ function BookAppointment({ doctors, onCreateAppointment }) {
               className="form-select"
               value={time}
               onChange={(e) => setTime(e.target.value)}
+              disabled={!date || availableSlots.length === 0}
+              required
             >
-              <option value="">Select a time slot</option>
-              {selectedDoctor.slots.map((slot) => (
+              <option value="">
+                {!date ? 'Select date first' : availableSlots.length === 0 ? 'No slots available' : 'Select a time slot'}
+              </option>
+              {availableSlots.map((slot) => (
                 <option key={slot} value={slot}>
                   {slot}
                 </option>
               ))}
             </select>
+            {date && availableSlots.length === 0 && (
+              <small style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.25rem', display: 'block' }}>
+                Loading available slots...
+              </small>
+            )}
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-            Confirm Appointment
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            style={{ width: '100%', marginTop: '1rem' }}
+            disabled={loading}
+          >
+            {loading ? 'Booking Appointment...' : 'Confirm Appointment'}
           </button>
         </form>
 
         {message && (
-          <div className={message.includes('successfully') ? 'success-message' : 'error-message'}>
+          <div className={message.includes('successfully') ? 'success-message' : 'error-message'} style={{ marginTop: '1rem' }}>
             {message}
           </div>
         )}

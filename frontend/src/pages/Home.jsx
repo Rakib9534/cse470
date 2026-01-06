@@ -1,6 +1,56 @@
-import { Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
-function Home() {
+function Home({ onNavigate }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, isAuthenticated } = useAuth();
+
+  const handleNavigate = (target) => {
+    if (onNavigate) {
+      // If we're inside PatientPortal, use the callback to change tabs
+      onNavigate(target);
+    } else {
+      // If we're on a standalone page, navigate to the appropriate portal
+      if (!isAuthenticated) {
+        navigate('/login');
+        return;
+      }
+
+      // Route based on user role and target
+      switch (target) {
+        case 'lab-upload':
+          if (user?.role === 'admin') {
+            navigate('/lab-upload');
+          } else {
+            // For non-admins, show a message or redirect
+            navigate('/patient-portal');
+          }
+          break;
+        
+        case 'doctors':
+        case 'book':
+        case 'dashboard':
+          if (user?.role === 'patient') {
+            navigate('/patient-portal', { state: { activeTab: target } });
+          } else {
+            // Doctors can also use patient portal features
+            navigate('/patient-portal', { state: { activeTab: target } });
+          }
+          break;
+        
+        default:
+          // Default fallback
+          if (user?.role === 'patient') {
+            navigate('/patient-portal');
+          } else if (user?.role === 'admin') {
+            navigate('/admin-portal');
+          } else if (user?.role === 'doctor') {
+            navigate('/doctor-portal');
+          }
+      }
+    }
+  };
   return (
     <div className="page-container">
       <div className="hero-section">
@@ -35,9 +85,13 @@ function Home() {
           <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: '1.6', flex: '1 1 auto' }}>
             View available doctors and their specializations. Check real-time availability and find the perfect match for your healthcare needs.
           </p>
-          <Link to="/doctors" className="btn btn-primary" style={{ width: '100%', textAlign: 'center', justifyContent: 'center', display: 'inline-flex', marginTop: 'auto' }}>
+          <button 
+            onClick={() => handleNavigate('doctors')} 
+            className="btn btn-primary" 
+            style={{ width: '100%', textAlign: 'center', justifyContent: 'center', display: 'inline-flex', marginTop: 'auto' }}
+          >
             View Doctors
-          </Link>
+          </button>
         </div>
 
         <div className="card" style={{ borderLeft: '3px solid var(--secondary-color)', background: 'linear-gradient(to right, rgba(22, 160, 133, 0.02) 0%, var(--bg-primary) 10%)', display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -63,9 +117,13 @@ function Home() {
           <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: '1.6', flex: '1 1 auto' }}>
             Select your preferred doctor, choose a convenient date and time slot, and confirm your appointment with just a few clicks.
           </p>
-          <Link to="/book" className="btn btn-primary" style={{ width: '100%', textAlign: 'center', justifyContent: 'center', display: 'inline-flex', marginTop: 'auto' }}>
+          <button 
+            onClick={() => handleNavigate('book')} 
+            className="btn btn-primary" 
+            style={{ width: '100%', textAlign: 'center', justifyContent: 'center', display: 'inline-flex', marginTop: 'auto' }}
+          >
             Book Appointment
-          </Link>
+          </button>
         </div>
 
         <div className="card" style={{ borderLeft: '3px solid var(--info-color)', background: 'linear-gradient(to right, rgba(52, 152, 219, 0.02) 0%, var(--bg-primary) 10%)', display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -91,9 +149,13 @@ function Home() {
           <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: '1.6', flex: '1 1 auto' }}>
             Access your personal dashboard to view, manage, and keep track of all your confirmed appointments in one place.
           </p>
-          <Link to="/dashboard" className="btn btn-primary" style={{ width: '100%', textAlign: 'center', justifyContent: 'center', display: 'inline-flex', marginTop: 'auto' }}>
+          <button 
+            onClick={() => handleNavigate('dashboard')} 
+            className="btn btn-primary" 
+            style={{ width: '100%', textAlign: 'center', justifyContent: 'center', display: 'inline-flex', marginTop: 'auto' }}
+          >
             View Dashboard
-          </Link>
+          </button>
         </div>
 
         <div className="card" style={{ borderLeft: '3px solid var(--warning-color)', background: 'linear-gradient(to right, rgba(243, 156, 18, 0.02) 0%, var(--bg-primary) 10%)', display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -119,9 +181,13 @@ function Home() {
           <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: '1.6', flex: '1 1 auto' }}>
             Lab technicians can upload test results and reports for patients. Access the lab portal to manage all laboratory documents.
           </p>
-          <Link to="/lab-upload" className="btn btn-primary" style={{ width: '100%', textAlign: 'center', justifyContent: 'center', display: 'inline-flex', marginTop: 'auto' }}>
+          <button 
+            onClick={() => handleNavigate('lab-upload')} 
+            className="btn btn-primary" 
+            style={{ width: '100%', textAlign: 'center', justifyContent: 'center', display: 'inline-flex', marginTop: 'auto' }}
+          >
             Go to Lab Upload
-          </Link>
+          </button>
         </div>
       </div>
     </div>
